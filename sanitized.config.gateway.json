@@ -1,0 +1,91 @@
+#
+#this is an example config.gateway.json file for a usg3 that connects with wireguard to a pfsense headend vpn server to have lan access between them
+#PFSense location has 172.22.0.0/16 network
+#usg location has 10.33.14.0/24 network
+#the PFSense wg tun interface is configured with 10.150.100.1/24
+#the usg is another ip on this subnet(10.150.100.4/24 in my case)
+#dynamic dns for usg setup using noip, reduce the max-interval so the account isn't suspended
+#the unifi controller exists on the lan of the pfsense network, I want to use the unifi connection over the VPN,
+# but I want it to use the public interface if the tunnel is down I need the dns to use my pfsense split resolution if its up
+#and clear the dns cache if its not by restarting dnsmasq
+#Don't nat traffic from the lans, I want them to behave like local lans to each other
+#replace 1.0.0.1 and 1.1.1.1 with whatever dns servers you want if you dont want to use those
+#the are quieried in reverse order from this file, which is why my pfsense dns is listed last, it will fail over to the others(when tun down)
+#
+#config starts below, remove this line and everything above
+{
+        "protocols": {
+                "static": {
+                        "route": {
+                                "172.22.0.0/16": {
+                                        "next-hop": {
+                                                "10.150.100.1": "''"
+                                        }
+                                }
+                        }
+                }
+        },
+        "service": {
+                "dns": {
+                        "dynamic": {
+                                "interface": {
+                                        "eth0": {
+                                                "service": {
+                                                        "noip": {
+                                                                "options": [
+                                                                        "max-interval=15d"
+                                                                ]
+                                                       }
+                                                }
+                                        }
+                                }
+                        },
+                        "forwarding": {
+                                "options": [
+					"clear-on-reload",
+					"strict-order",
+					"server=1.0.0.1",
+					"server=1.1.1.1",
+                                        "server=/unifi.controller.fqdn/1.0.0.1",
+                                        "server=/unifi.controller.fqdn/1.1.1.1",
+                                        "server=/unifi.controller.fqdn/172.22.1.1"
+                              ]
+                        }
+
+                },
+                "nat": {
+                        "rule": {
+                                "5999": {
+                                        "exclude": "''",
+                                        "outbound-interface": "wg0",
+                                        "type": "masquerade"
+                                }
+			}
+		}
+	},
+        "interfaces": {
+                "wireguard": {
+                        "wg0": {
+                                "address": [
+                                        "10.150.100.4/24"
+                                ],
+                                "down-command": "/etc/init.d/dnsmasq restart",
+                                "listen-port": "51820",
+                                "mtu": "1420",
+                                "peer": {
+                                        "PEERSTRINGHERE": {
+                                                "allowed-ips": [
+                                                        "10.150.100.0/24",
+                                                        "172.22.1.0/16"
+                                                ],
+                                                "endpoint": "vpn.mypfsense.fqdn:51820",
+                                                "preshared-key": "/config/auth/wireguard/wg_ps.key"
+                                        }
+                                },
+                                "private-key": "/config/auth/wireguard/wg_private.key",
+                                "route-allowed-ips": "false",
+                                "up-command": "/etc/init.d/dnsmasq restart"
+                        }
+                }
+        }
+}
