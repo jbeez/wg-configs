@@ -1,0 +1,52 @@
+In my configuration I use a separate /31 PtP cidr block in the 10.150.0.x range, chose an appropriate IP range for what you would like all your
+wireguard interfaces to use.
+
+Steps for adding a new site2site
+
+1) Add new Tunnel
+        description: Name Site2Site wgX
+        Generate Keys
+        Note the public key and port
+        Save tunnel & Apply
+
+2) Look at System-> Routing to determine the next available /31 IP block and note that
+
+3) Assign an interface
+        dropdown select the new wg
+        click the new "opt" interface name
+        Check: Enable at the top
+        convention: Sitename_Site2Site_wgX
+        IPv4 Static IPv4
+        MTU: 1420
+        IPv4 Address: Next available /31 in 10.150.0.x (Even Number on PFSense Side, +1 for other side)
+        Save & Apply
+
+4) Back to System -> Routing
+        Gateways
+        Add
+        Address Family IPv4
+        Name: WG_VPN_sitename_V4
+        Gateway: 10.150.0.(IP assigned to this FW side of the tunnel /31, even number)
+        Monitor IP: Lan IP of remote peer firewall/router
+
+        Static Route
+        Add remote LAN netblocks to new gateway
+
+5) Goto Firewall Rules
+        add an ipv4 allow any/any for the new interface ruleset
+
+6) Run Script
+        ssh fw (or wherever you are running the script that has wireguard tools)
+        wg_site_to_site_peer.sh
+        Supply Public Key & Port from step 1
+        Supply Remote PTP link IP from step 2
+
+7) Goto the Tunnel config, open the tunnel with no peers, click to add a peer
+        Dynamic unless you have dyndns or static IP for remote side
+        public key from the wireguard command in #6 (contents of wg.pub)
+        preshared key(contents of wg.psk)
+        Allowed IPs,  add the subnets that exist on the remote site and the 10.150.0.x/31 point to point peer OR the 3 rfc1918 blocks
+
+8) Remote side
+https://github.com/WireGuard/wireguard-vyatta-ubnt
+er-x: https://github.com/WireGuard/wireguard-vyatta-ubnt/releases/download/1.0.20220627-1/e50-v2-v1.0.20220627-v1.0.20210914.deb
